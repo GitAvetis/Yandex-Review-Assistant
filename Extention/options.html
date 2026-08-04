@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Настройки Review Assistant</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      width: 400px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #333;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 13px;
+    }
+    button {
+      margin-top: 12px;
+      padding: 8px 16px;
+      background: #4caf50;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: green;
+    }
+  </style>
+</head>
+<body>
+  <h3>Настройки Review Assistant</h3>
+  <label for="apiKey">API-ключ OpenRouter</label>
+  <input type="password" id="apiKey" placeholder="sk-or-v1-...">
+  <button id="saveBtn">Сохранить</button>
+  <div id="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>
