@@ -1,135 +1,82 @@
-﻿using System.Reflection;
+﻿using GigaChatReplyServer;
+using GigaChatReplyServer.Application;
+using GigaChatReplyServer.Endpoints;
+using GigaChatReplyServer.Infrastructure;
+using GigaChatReplyServer.Middlewares;
+using GigaChatReplyServer.Options;
 
-namespace GigaChatReplyServer
+public class Program
 {
-
-    public record ReviewRequest(string Text);
-
-    public class Program
+    [STAThread]
+    public static void Main()
     {
-        private static NotifyIcon? _trayIcon;
-        private static WebApplication? _webApp;
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
 
-        [STAThread]
-        public static void Main()
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            LogAndShowException(e.ExceptionObject as Exception);
+
+        try
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-
-            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
-            {
-                LogAndShowException(e.ExceptionObject as Exception);
-            };
-
-            try
-            {
-                StartWebServer();
-                StartTrayIcon();
-            }
-            catch (Exception ex)
-            {
-                LogAndShowException(ex);
-            }
-
-            Application.Run(); // Держим приложение живым, пока висит трей-иконка
+            var app = BuildWebApp();
+            _ = app.RunAsync();
+            new TrayHost(app).Start();
+        }
+        catch (Exception ex)
+        {
+            LogAndShowException(ex);
         }
 
-        private static void LogAndShowException(Exception? ex)
-        {
-            try
+        Application.Run();
+    }
+
+    private static WebApplication BuildWebApp()
+    {
+        var builder = WebApplication.CreateBuilder();
+
+        builder.Services.AddCors();
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen();
+
+        builder.Services.Configure<GigaChatOptions>(builder.Configuration.GetSection(GigaChatOptions.SectionName));
+
+        builder.Services.AddHttpClient<IGigaChatClient, GigaChatClient>()
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
-                var logPath = Path.Combine(AppContext.BaseDirectory, "crash.log");
-                File.AppendAllText(logPath, $"{DateTime.Now}: {ex}\n\n");
-            }
-            catch { /* если даже запись в файл не удалась — игнорируем */ }
-
-            MessageBox.Show(
-                ex?.ToString() ?? "Неизвестная ошибка",
-                "Ошибка запуска",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
-        }
-
-        private static void StartWebServer()
-        {
-            var builder = WebApplication.CreateBuilder();
-            builder.Services.AddCors();
-            builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
-
-            var app = builder.Build();
-
-            app.UseSwagger();
-            app.UseSwaggerUI();
-            app.Use(async (context, next) =>
-            {
-                if (context.Request.Method == "OPTIONS")
-                {
-                    context.Response.Headers.Append("Access-Control-Allow-Private-Network", "true");
-                }
-                await next();
-            });
-            app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-
-            var configPath = Path.Combine(AppContext.BaseDirectory, "config.txt");
-            var chatContextPath = Path.Combine(AppContext.BaseDirectory, "chatContext.txt");
-            var chatContext = File.ReadAllText(chatContextPath);
-            var authKey = File.ReadAllText(configPath).Trim();
-            var client = new GigaChatClient(authKey);
-
-            app.MapPost("/reply", async (ReviewRequest req) =>
-            {
-                var reply = await client.GenerateReplyAsync("GigaChat-3-Ultra", req.Text, chatContext);
-                return Results.Ok(new { reply });
+                // см. пояснение про доверие к сертификату НУЦ Минцифры ниже
+                ServerCertificateCustomValidationCallback = (_, _, _, _) => true
             });
 
-            app.Urls.Add("http://localhost:5005");
+        builder.Services.AddScoped<IReviewReplyService, ReviewReplyService>();
 
-            _webApp = app;
-            _ = app.RunAsync(); // Не блокируем поток - сервер работает в фоне
-        }
+        var app = builder.Build();
 
-        private static void StartTrayIcon()
+        app.UseSwagger();
+        app.UseSwaggerUI();
+        app.Use(async (context, next) =>
         {
-            var menu = new ContextMenuStrip();
+            if (context.Request.Method == "OPTIONS")
+                context.Response.Headers.Append("Access-Control-Allow-Private-Network", "true");
+            await next();
+        });
+        app.UseCors(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+        app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-            menu.Items.Add("открыть Swagger", null, (s, e) =>
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "http://localhost:5005/swagger",
-                    UseShellExecute = true
-                });
-            });
+        app.MapReviewEndpoints();
+        app.Urls.Add("http://localhost:5005");
 
-            menu.Items.Add("Выход", null, async (s, e) =>
-            {
-                if (_trayIcon != null) _trayIcon.Visible = false;
-                if (_webApp != null) await _webApp.StopAsync();
-                Application.Exit();
-            });
+        return app;
+    }
 
-            _trayIcon = new NotifyIcon
-            {
-                Icon = LoadEmbeddedIcon(),
-                Visible = true,
-                Text = "GigaChat Reply Server",
-                ContextMenuStrip = menu
-            };
-        }
-
-        private static System.Drawing.Icon LoadEmbeddedIcon()
+    private static void LogAndShowException(Exception? ex)
+    {
+        try
         {
-            var assembly = Assembly.GetExecutingAssembly();
-            using var stream = assembly.GetManifestResourceStream("app.ico");
-
-            if (stream == null)
-            {
-                // Возвращаем иконку по умолчанию, если что-то пошло не так при загрузке ресурса
-                return System.Drawing.SystemIcons.Application;
-            }
-
-            return new System.Drawing.Icon(stream);
+            File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "crash.log"), $"{DateTime.Now}: {ex}\n\n");
         }
+        catch { }
+
+        MessageBox.Show(ex?.ToString() ?? "Неизвестная ошибка", "Ошибка запуска",
+            MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 }
