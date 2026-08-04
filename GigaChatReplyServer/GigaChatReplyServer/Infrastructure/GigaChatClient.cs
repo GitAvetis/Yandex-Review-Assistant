@@ -35,7 +35,7 @@ namespace GigaChatReplyServer.Infrastructure
                     "https://ngw.devices.sberbank.ru:9443/api/v2/oauth");
 
                 request.Headers.Add("RqUID", Guid.NewGuid().ToString());
-                request.Headers.Authorization = new AuthenticationHeaderValue("Basic", _options.AuthKey);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Basic", _options.AuthKey.Trim());
                 request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 request.Content = new FormUrlEncodedContent(new[]
                 {
