@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Yandex Review Response Assistant",
-  "version": "0.4.0",
-  "description": "Помогает генерировать ответы на отзывы в Яндекс Бизнесе",
+  "version": "0.5.0",
+  "description": "Помогает генерировать ответы на отзывы в Яндекс Бизнесе через локальный сервер GigaChatReplyServer",
   "permissions": ["storage"],
-  "host_permissions": ["http://localhost:5005/*"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
   "icons": {
     "16": "icon.png",
     "48": "icon.png",
@@ -12,11 +12,12 @@
   },
   "action": {
     "default_icon": "icon.png",
-    "default_title": "Review Assistant"
+    "default_title": "Review Assistant",
+    "default_popup": "options.html"
   },
   "content_scripts": [
     {
-      "matches": ["https://yandex.ru/sprav/*/p/edit/reviews/*"],
+      "matches": ["https://yandex.ru/sprav/*/p/edit/reviews*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }

@@ -9,10 +9,10 @@ namespace GigaChatReplyServer.Application
         private readonly IGigaChatClient _client;
         private readonly string _chatContext;
 
-        public ReviewReplyService(IGigaChatClient client, IOptions<GigaChatOptions> options, IHostEnvironment env)
+        public ReviewReplyService(IGigaChatClient client, IOptions<GigaChatOptions> options)
         {
             _client = client;
-            var path = Path.Combine(env.ContentRootPath, options.Value.ChatContextFile);
+            var path = Path.Combine(AppContext.BaseDirectory, options.Value.ChatContextFile);
             _chatContext = File.ReadAllText(path);
         }
 

@@ -43,7 +43,6 @@ public class Program
         builder.Services.AddHttpClient<IGigaChatClient, GigaChatClient>()
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
-                // см. пояснение про доверие к сертификату НУЦ Минцифры ниже
                 ServerCertificateCustomValidationCallback = (_, _, _, _) => true
             });
 

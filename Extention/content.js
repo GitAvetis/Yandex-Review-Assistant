@@ -4,10 +4,21 @@
   const TEXTAREA_SELECTOR = '.ya-business-ui-textarea__control';
   const REVIEW_SELECTOR = '.Review';
   const REVIEW_TEXT_SELECTOR = '.Review-Text';
-  const SERVER_URL = 'http://localhost:5005/reply';
+  const DEFAULT_SERVER_URL = 'http://localhost:5005';
 
   let activeTextarea = null;
   let currentGeneratedText = '';
+
+  // ---------- Адрес сервера (настраивается на странице options.html) ----------
+
+  function getServerUrl() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['serverUrl'], (result) => {
+        const raw = (result.serverUrl || DEFAULT_SERVER_URL).trim();
+        resolve(raw.replace(/\/+$/, ''));
+      });
+    });
+  }
 
   // ---------- Кнопка "Сгенерировать ответ" ----------
 
@@ -262,8 +273,11 @@
       previewTextField.value = generatedText;
     } catch (err) {
       console.error('Ошибка генерации:', err);
+      const serverUrl = await getServerUrl();
       previewTextField.value =
-        'Не удалось получить ответ от сервера. Убедитесь, что приложение GigaChatReplyServer запущено (иконка в трее).';
+        `Не удалось получить ответ от сервера (${serverUrl}). ` +
+        'Убедитесь, что приложение GigaChatReplyServer запущено (иконка в трее), ' +
+        'а адрес в настройках расширения указан верно.';
     } finally {
       setPreviewLoadingState(false);
     }
@@ -279,7 +293,9 @@
   // ---------- Реальный вызов GigaChat-сервера ----------
 
   async function generateReplyFromServer(reviewText) {
-    const response = await fetch(SERVER_URL, {
+    const serverUrl = await getServerUrl();
+
+    const response = await fetch(`${serverUrl}/reply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: reviewText }),
@@ -290,6 +306,10 @@
     }
 
     const data = await response.json();
+    if (!data || typeof data.reply !== 'string') {
+      throw new Error('Сервер вернул ответ в неожиданном формате.');
+    }
+
     return data.reply;
   }
 
